@@ -8,14 +8,13 @@
 [![Read The Docs](https://img.shields.io/readthedocs/kbmod-ml)](https://kbmod-ml.readthedocs.io/)
 [![Benchmarks](https://img.shields.io/github/actions/workflow/status/dirac-institute/kbmod_ml/asv-main.yml?label=benchmarks)](https://dirac-institute.github.io/kbmod_ml/)
 
-This project was automatically generated using the LINCC-Frameworks 
-[python-project-template](https://github.com/lincc-frameworks/python-project-template).
-
-A repository badge was added to show that this project uses the python-project-template, however it's up to
-you whether or not you'd like to display it!
-
-For more information about the project template see the 
-[documentation](https://lincc-ppt.readthedocs.io/en/latest/).
+This project depends on ``fibad`` which is not yet available from PyPI. Please install it from source:
+```
+>> git clone https://github.com/lincc-frameworks/fibad.git
+# activate the environment used for kbmod-ml
+>> cd fibad
+>> pip install -e .
+```
 
 ## Dev Guide - Getting Started
 
