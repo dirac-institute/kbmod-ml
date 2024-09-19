@@ -41,27 +41,21 @@ timeout = 3600
 chunksize = 990
 
 [model]
-# name = "ExampleCNN"
-# name = "ExampleAutoencoder"
-
-# An example of requesting an external model class
-# external_class = "user_package.submodule.ExternalModel"
-external_cls = "kbmod_ml.models.cnn.CNN"
+# The name of the built-in model to use or the libpath to an external model
+# e.g. "user_package.submodule.ExternalModel" or "ExampleAutoencoder"
+name = "kbmod_ml.models.cnn.CNN"
 
 weights_filepath = "example_model.pth"
 epochs = 10
 
 [data_loader]
-# Name of data loader to use
+# Name of the built-in data loader to use or the libpath to an external data loader
+# e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
 name = "CifarDataLoader"
 # name = "HSCDataLoader"
 
-# An example of requesting an external data loader class
-# external_class = "user_package.submodule.ExternalDataLoader"
-
 # Directory path where the data is stored
-path = "/Users/drew/code/fibad/data/cifar-10-batches-py"
-# path = "/Users/drew/code/fibad/data/hsc-samples"
+path = "/home/drew/code/fibad/data/"
 
 # Default PyTorch DataLoader parameters
 batch_size = 10
