@@ -16,19 +16,21 @@ log_destination = "stderr"
 log_level = "info"     # Emit informational messages, warnings and all errors
 # log_level = "debug"    # Very verbose, emit all log messages.
 
+data_dir = "/home/drew/code/fibad/data/"
+
 [download]
 sw = "22asec"
 sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
-username = "mtauraso@local"
-password = "cCw+nX53lmNLHMy+JbizpH/dl4t7sxljiNm6a7k1"
-max_connections = 2
-fits_file = "../hscplay/temp.fits"
-cutout_dir = "../hscplay/cutouts/"
+username = false
+password = false
+num_sources = -1 # Values below 1 here indicate all sources in the catalog will be downloaded
 offset = 0
-num_sources = 500
+concurrent_connections = 4
+stats_print_interval = 60
+fits_file = "./catalog.fits"
 
 # These control the downloader's HTTP requests and retries
 # `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
@@ -38,7 +40,14 @@ retries = 3
 # `timepout` How long should we wait to get a full HTTP response from the server. Default 3600s (1hr)
 timeout = 3600
 # `chunksize` How many sky location rectangles should we request in a single request. Default is 990
-chunksize = 990
+chunk_size = 990
+
+# Whether to retrieve the image layer
+image = true
+# Whether to retrieve the variance layer
+variance = false
+# Whether to retrieve the mask layer
+mask = false
 
 [model]
 # The name of the built-in model to use or the libpath to an external model
@@ -48,19 +57,35 @@ name = "kbmod_ml.models.cnn.CNN"
 weights_filepath = "example_model.pth"
 epochs = 10
 
+base_channel_size = 32
+latent_dim =64
+
 [data_loader]
 # Name of the built-in data loader to use or the libpath to an external data loader
 # e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
 name = "CifarDataLoader"
-# name = "HSCDataLoader"
 
-# Directory path where the data is stored
-path = "/home/drew/code/fibad/data/"
+
+# Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
+#
+# If not provided by user, the default of 'false' scans the directory for the smallest dimensioned files, and 
+# uses those pixel dimensions as the crop size.
+#
+#crop_to = [100,100]
+crop_to = false
+
+# Limit data loader to only particular filters when there are more in the data set.
+#
+# When not provided by the user, the number of filters will be automatically gleaned from the data set.
+# Defaults behavior is produced by the false value.
+#
+#filters = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+filters = false
 
 # Default PyTorch DataLoader parameters
-batch_size = 10
+batch_size = 4
 shuffle = true
-num_workers = 10
+num_workers = 2
 
 [predict]
 batch_size = 32
