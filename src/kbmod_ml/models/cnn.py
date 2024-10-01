@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @fibad_model
 class CNN(nn.Module):
-    def __init__(self, model_config, shape):
+    def __init__(self, config, shape):
         logger.info("This is an external model, not in FIBAD!!!")
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
@@ -25,7 +25,7 @@ class CNN(nn.Module):
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
-        self.config = model_config
+        self.config = config
 
         # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
         # but we define them as methods as a way to allow for more flexibility in the future.
