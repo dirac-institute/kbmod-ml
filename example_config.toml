@@ -17,6 +17,7 @@ log_level = "info"     # Emit informational messages, warnings and all errors
 # log_level = "debug"    # Very verbose, emit all log messages.
 
 data_dir = "/home/drew/code/fibad/data/"
+results_dir = "./results" # Results get named <verb>-<timestamp> under this directory
 
 [download]
 sw = "22asec"
@@ -52,20 +53,20 @@ mask = false
 [model]
 # The name of the built-in model to use or the libpath to an external model
 # e.g. "user_package.submodule.ExternalModel" or "ExampleAutoencoder"
-name = "kbmod_ml.models.cnn.CNN"
+name = "kbmod_ml.models.resnet50.RESNET50"
 
-weights_filepath = "example_model.pth"
+weights_filepath = "resnet50.pth"
 epochs = 10
 
-base_channel_size = 32
-latent_dim =64
+num_classes = 10
 
-[data_loader]
+
+[data_set]
 # Name of the built-in data loader to use or the libpath to an external data loader
 # e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
 name = "CifarDataLoader"
 
-
+[data_loader]
 # Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
 #
 # If not provided by user, the default of 'false' scans the directory for the smallest dimensioned files, and 
@@ -83,9 +84,10 @@ crop_to = false
 filters = false
 
 # Default PyTorch DataLoader parameters
-batch_size = 4
+batch_size = 10
 shuffle = true
-num_workers = 2
+num_workers = 10
 
 [predict]
+model_weights_file = false
 batch_size = 32
