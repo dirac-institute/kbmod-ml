@@ -151,3 +151,6 @@ _html/
 
 # Model files
 **/*.pth
+
+# Run results
+results/
