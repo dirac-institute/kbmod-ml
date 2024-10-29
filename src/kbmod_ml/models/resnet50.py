@@ -16,13 +16,16 @@ logger = logging.getLogger(__name__)
 
 @fibad_model
 class RESNET50(nn.Module):
-    def __init__(self, model_config, shape):
+    def __init__(self, config, shape):
         logger.info("This is an external model, not in FIBAD!!!")
         super().__init__()
 
-        self.config = model_config
+        self.config = config
 
-        self.model = resnet50(pretrained=False, num_classes=self.config["model"]["num_classes"])
+        self.model = resnet50(pretrained=config["predict"]["model_weights_file"], num_classes=2)
+
+        # Modify the input channels to 1 (e.g., for grayscale images)
+        self.model = self.modify_resnet_input_channels(self.model, num_channels=shape[0])
 
         # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
         # but we define them as methods as a way to allow for more flexibility in the future.
@@ -63,3 +66,22 @@ class RESNET50(nn.Module):
 
     def save(self):
         torch.save(self.state_dict(), self.config.get("weights_filepath"))
+
+    def modify_resnet_input_channels(self, model, num_channels):
+        # Get the first convolutional layer
+        first_conv_layer = model.conv1
+
+        # Create a new convolutional layer with the desired number of input channels
+        new_conv_layer = nn.Conv2d(
+            in_channels=num_channels, 
+            out_channels=first_conv_layer.out_channels, 
+            kernel_size=first_conv_layer.kernel_size, 
+            stride=first_conv_layer.stride, 
+            padding=first_conv_layer.padding, 
+            bias=first_conv_layer.bias
+        )
+
+        # Replace the first convolutional layer in the model
+        model.conv1 = new_conv_layer
+
+        return model
