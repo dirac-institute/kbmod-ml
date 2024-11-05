@@ -14,7 +14,7 @@ class KbmodStamps():
     We could have an "active columns" variable, with the indices of the columns we want to grab
     (corresponding to which coadd type we want to use), which could reflect in the `shape` function.
     """
-    def __init__(self, config):
+    def __init__(self, config, split=False):
         coadd_type_to_column = {
             "median": 0,
             "mean": 1,
@@ -29,8 +29,8 @@ class KbmodStamps():
 
         self.active_columns = np.array(cols)
 
-        true_data_path = os.path.join(config["general"]["data_dir"], "true_train_stamps.npy")
-        false_data_path = os.path.join(config["general"]["data_dir"], "false_train_stamps.npy")
+        true_data_path = os.path.join("./false_positive_stamps", "true_train_stamps.npy")
+        false_data_path = os.path.join("./false_positive_stamps", "false_train_stamps.npy")
 
         if not os.path.isfile(true_data_path):
             raise ValueError("could not find 'true_train_stamps.py' in provided 'data_dir'")
