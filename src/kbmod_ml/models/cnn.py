@@ -7,7 +7,6 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
-import torch.optim as optim
 from fibad.models.model_registry import fibad_model
 
 logger = logging.getLogger(__name__)
@@ -16,29 +15,22 @@ logger = logging.getLogger(__name__)
 @fibad_model
 class CNN(nn.Module):
     def __init__(self, config, shape):
-        logger.info("This is an external model, not in FIBAD!!!")
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(shape[0] * shape[1] * shape[2], 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 2)
+        self.conv1 = nn.Conv2d(shape[0], 16, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(64 * shape[1] * shape[2], 1)
 
         self.config = config
 
-        # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
-        # but we define them as methods as a way to allow for more flexibility in the future.
-        self.optimizer = self._optimizer()
-        self.criterion = self._criterion()
-
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
+        if isinstance(x, tuple):
+            x, _ = x
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
         x = torch.flatten(x, 1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.sigmoid(self.fc1(x))
         return x
 
     def train_step(self, batch):
@@ -59,16 +51,10 @@ class CNN(nn.Module):
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
-        loss = self.criterion(outputs, labels)
+        loss = self.criterion(outputs, labels.unsqueeze(1).float())
         loss.backward()
         self.optimizer.step()
         return {"loss": loss.item()}
 
     def _criterion(self):
-        return nn.CrossEntropyLoss()
-
-    def _optimizer(self):
-        return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
-
-    def save(self):
-        torch.save(self.state_dict(), self.config.get("weights_filepath", "example_cnn.pth"))
+        return nn.BCELoss()
