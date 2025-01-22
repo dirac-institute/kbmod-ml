@@ -28,7 +28,7 @@ class KbmodStamps:
 
         cols = []
 
-        for c in ["mean", "median"]:
+        for c in ["mean"]:
             cols.append(coadd_type_to_column[c])
 
         self.active_columns = np.array(cols)
