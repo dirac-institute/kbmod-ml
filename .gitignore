@@ -154,3 +154,6 @@ _html/
 
 # Run results
 results/
+
+# Test data
+data/
