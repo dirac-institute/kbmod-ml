@@ -1,0 +1,13 @@
+[data_set]
+name = "kbmod_ml.data_sets.kbmod_stamps.KbmodStamps"
+
+train_size = 0.8
+
+validate_size = 0.2
+
+[kbmod_ml]
+# The file name of the true positive samples
+true_positive_file_name = 'true_positive_stamps_full.npy'
+
+# The file name of the false positive samples
+false_positive_file_name = 'false_positive_stamps_trimmed.npy'

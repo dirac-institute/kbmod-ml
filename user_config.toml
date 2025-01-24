@@ -1,0 +1,14 @@
+[general]
+dev_mode = true
+
+data_dir = "/Users/drew/code/kbmod-ml/data"
+
+results_dir = "./results"
+
+[model]
+name = "kbmod_ml.models.cnn.CNN"
+
+weights_filepath = "resnet50.pth"
+
+[infer]
+chromadb = false
