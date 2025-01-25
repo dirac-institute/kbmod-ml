@@ -64,13 +64,13 @@ def generate_random_selections(rows, n, variances=None, visits=None):
         if visits is not None:
             sub_vis = visits[inds]
 
-        lis = []
+        l_imgs = []
         for s, v in zip(sub_stamps, sub_vars):
             rivar = RawImage(v) if v is not None else RawImage(21, 21, 0.0)
-            li = LayeredImage(RawImage(s), rivar, RawImage(21, 21, 0.0), PSF(1.0))
-            lis.append(li)
+            layered_img = LayeredImage(RawImage(s), rivar, RawImage(21, 21, 0.0), PSF(1.0))
+            l_imgs.append(layered_img)
 
-        im_stack = ImageStack(lis)
+        im_stack = ImageStack(l_imgs)
         i = im_stack.img_count()
         params = StampParameters()
         params.radius = 10
@@ -81,8 +81,8 @@ def generate_random_selections(rows, n, variances=None, visits=None):
 
         for st in s_types:
             params.stamp_type = st
-            bleh = get_coadded_stamps(im_stack, [Trajectory(10, 10)], [[True]* i], params, False)
-            stamps.append(bleh[0].image)
+            stamp = get_coadded_stamps(im_stack, [Trajectory(10, 10)], [[True]* i], params, False)
+            stamps.append(stamp[0].image)
         coadds.append(stamps)
         viss.append(sub_vis)
     return coadds, viss
