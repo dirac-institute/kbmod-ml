@@ -66,7 +66,9 @@ def generate_random_selections(rows, n, variances=None, visits=None):
 
         l_imgs = []
         for s, v in zip(sub_stamps, sub_vars):
+            # if variance supplied, pass that along. Otherwise create a default if it's not used.
             rivar = RawImage(v) if v is not None else RawImage(21, 21, 0.0)
+            # create a layered image with science, variance, and empty mask.
             layered_img = LayeredImage(RawImage(s), rivar, RawImage(21, 21, 0.0), PSF(1.0))
             l_imgs.append(layered_img)
 
@@ -81,6 +83,7 @@ def generate_random_selections(rows, n, variances=None, visits=None):
 
         for st in s_types:
             params.stamp_type = st
+            # Create a coadded stamp using a Trajectory with no motion (i.e., just the center pixels.)
             stamp = get_coadded_stamps(im_stack, [Trajectory(10, 10)], [[True]* i], params, False)
             stamps.append(stamp[0].image)
         coadds.append(stamps)
