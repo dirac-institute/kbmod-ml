@@ -1,0 +1,18 @@
+[general]
+dev_mode = true
+
+data_dir = "."
+
+results_dir = "./results"
+
+[model]
+name = "kbmod_ml.models.cnn.CNN"
+
+weights_filepath = "resnet50.pth"
+
+[infer]
+chromadb = false
+
+[kbmod_ml]
+true_positive_file_name = 'true_positive_toy.npy'
+false_positive_file_name = 'false_positive_toy.npy'
