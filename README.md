@@ -8,11 +8,11 @@
 [![Read The Docs](https://img.shields.io/readthedocs/kbmod-ml)](https://kbmod-ml.readthedocs.io/)
 [![Benchmarks](https://img.shields.io/github/actions/workflow/status/dirac-institute/kbmod_ml/asv-main.yml?label=benchmarks)](https://dirac-institute.github.io/kbmod_ml/)
 
-This project depends on ``fibad`` which is not yet available from PyPI. Please install it from source:
+This project depends on ``hyrax`` which is not yet available from PyPI. Please install it from source:
 ```
->> git clone https://github.com/lincc-frameworks/fibad.git
+>> git clone https://github.com/lincc-frameworks/hyrax.git
 # activate the environment used for kbmod-ml
->> cd fibad
+>> cd hyrax
 >> pip install -e .
 ```
 

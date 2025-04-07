@@ -3,13 +3,13 @@
 import logging
 
 import torch.nn as nn
-from fibad.models.model_registry import fibad_model
+from hyrax.models.model_registry import hyrax_model
 from torchvision.models import resnet50
 
 logger = logging.getLogger(__name__)
 
 
-@fibad_model
+@hyrax_model
 class RESNET50(nn.Module):
     def __init__(self, config, shape):
         super().__init__()

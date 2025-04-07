@@ -2,12 +2,11 @@ import os
 
 import numpy as np
 import torch
-from fibad.data_sets.data_set_registry import fibad_data_set
+from hyrax.data_sets.data_set_registry import HyraxDataset
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-@fibad_data_set
-class KbmodStamps:
+class KbmodStamps(HyraxDataset):
     """TODO: what is the actual shape of the data that we're going to want to import?
     my initial thoughts is that we'll have a single numpy array that we stitch together
     from the two datasets (adding a column with a classification based on which set
@@ -18,7 +17,7 @@ class KbmodStamps:
     (corresponding to which coadd type we want to use), which could reflect in the `shape` function.
     """
 
-    def __init__(self, config, split: str):
+    def __init__(self, config):
         coadd_type_to_column = {
             "median": 0,
             "mean": 1,
@@ -56,25 +55,24 @@ class KbmodStamps:
         )
         self._data = np.concatenate([true_positive_samples[:, :3, :, :], false_positive_samples])
 
-        if split != "test":
-            num_train = len(self)
-            indices = list(range(num_train))
-            split_idx = 0
-            if config["data_set"]["validate_size"]:
-                split_idx = int(np.floor(config["data_set"]["validate_size"] * num_train))
+        num_train = len(self)
+        indices = list(range(num_train))
+        split_idx = 0
+        if config["data_set"]["validate_size"]:
+            split_idx = int(np.floor(config["data_set"]["validate_size"] * num_train))
 
-            random_seed = None
-            if config["data_set"]["seed"]:
-                random_seed = config["data_set"]["seed"]
-            np.random.seed(random_seed)
-            np.random.shuffle(indices)
+        random_seed = None
+        if config["data_set"]["seed"]:
+            random_seed = config["data_set"]["seed"]
+        np.random.seed(random_seed)
+        np.random.shuffle(indices)
 
-            train_idx, valid_idx = indices[split_idx:], indices[:split_idx]
+        train_idx, valid_idx = indices[split_idx:], indices[:split_idx]
 
-            # These samplers are used by PyTorch's DataLoader to split the dataset
-            # into training and validation sets.
-            self.train_sampler = SubsetRandomSampler(train_idx)
-            self.validation_sampler = SubsetRandomSampler(valid_idx)
+        # These samplers are used by PyTorch's DataLoader to split the dataset
+        # into training and validation sets.
+        self.train_sampler = SubsetRandomSampler(train_idx)
+        self.validation_sampler = SubsetRandomSampler(valid_idx)
 
     def shape(self):
         """data shape, including currently enabled columns"""

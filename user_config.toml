@@ -1,14 +1,26 @@
 [general]
 dev_mode = true
 
-data_dir = "/Users/drew/code/kbmod-ml/data"
+data_dir = "/Users/maxwest/data/kbmod_stamps"
 
-results_dir = "./results"
+results_dir = "~/kbml_results"
+
+[train]
+split = "train"
 
 [model]
 name = "kbmod_ml.models.cnn.CNN"
 
 weights_filepath = "resnet50.pth"
+
+[data_set]
+train_size = 0.7
+validate_size = 0.2
+test_size = 0.1
+
+[kbmod_ml]
+true_positive_file_name = "true_positive_stamps_full.npy"
+false_positive_file_name = "false_positive_stamps_full.npy"
 
 [infer]
 chromadb = false
