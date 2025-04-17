@@ -3,13 +3,13 @@ dev_mode = true
 
 data_dir = "/Users/maxwest/data/kbmod_stamps"
 
-results_dir = "~/kbml_results"
+results_dir = "/Users/maxwest/data/kbml_results"
 
 [train]
 split = "train"
 
 [model]
-name = "kbmod_ml.models.cnn.CNN"
+name = "kbmod_ml.models.resnet50.RESNET50"
 
 weights_filepath = "resnet50.pth"
 
@@ -24,3 +24,7 @@ false_positive_file_name = "false_positive_stamps_full.npy"
 
 [infer]
 chromadb = false
+split = "test"
+
+# [vector_db]
+# name = "false"

@@ -3,10 +3,11 @@ import os
 import numpy as np
 import torch
 from hyrax.data_sets.data_set_registry import HyraxDataset
+from torch.utils.data import Dataset
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-class KbmodStamps(HyraxDataset):
+class KbmodStamps(HyraxDataset, Dataset):
     """TODO: what is the actual shape of the data that we're going to want to import?
     my initial thoughts is that we'll have a single numpy array that we stitch together
     from the two datasets (adding a column with a classification based on which set
@@ -18,6 +19,7 @@ class KbmodStamps(HyraxDataset):
     """
 
     def __init__(self, config):
+        super().__init__(config)
         coadd_type_to_column = {
             "median": 0,
             "mean": 1,
@@ -55,24 +57,12 @@ class KbmodStamps(HyraxDataset):
         )
         self._data = np.concatenate([true_positive_samples[:, :3, :, :], false_positive_samples])
 
-        num_train = len(self)
-        indices = list(range(num_train))
-        split_idx = 0
-        if config["data_set"]["validate_size"]:
-            split_idx = int(np.floor(config["data_set"]["validate_size"] * num_train))
+        metadata_table = self._read_metadata()
+        super().__init__(config, metadata_table)
 
-        random_seed = None
-        if config["data_set"]["seed"]:
-            random_seed = config["data_set"]["seed"]
-        np.random.seed(random_seed)
-        np.random.shuffle(indices)
-
-        train_idx, valid_idx = indices[split_idx:], indices[:split_idx]
-
-        # These samplers are used by PyTorch's DataLoader to split the dataset
-        # into training and validation sets.
-        self.train_sampler = SubsetRandomSampler(train_idx)
-        self.validation_sampler = SubsetRandomSampler(valid_idx)
+    def ids(self):
+        """Return the ids of the data set"""
+        return np.arange(len(self._data))
 
     def shape(self):
         """data shape, including currently enabled columns"""
@@ -80,6 +70,16 @@ class KbmodStamps(HyraxDataset):
         width, height = self._data[0][0].shape
 
         return (cols, width, height)
+    
+    def _read_metadata(self):
+        """This is a pretend implementation so we don't use the path passed, which you might use
+        to find your .csv/.fits/.tsv catalog file and call astropy's Table.read().
+
+        We simply construct a table from our mock data"""
+        from astropy.table import Table
+
+        global ras, decs, filenames
+        return Table({"object_id": self.ids(), "classification": self._labels})
 
     def __getitem__(self, idx):
         row = self._data[idx][self.active_columns]
