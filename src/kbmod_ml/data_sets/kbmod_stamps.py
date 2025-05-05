@@ -57,6 +57,8 @@ class KbmodStamps(HyraxDataset, Dataset):
         )
         self._data = np.concatenate([true_positive_samples[:, :3, :, :], false_positive_samples])
 
+        self.normalize_stamps()
+
         metadata_table = self._read_metadata()
         super().__init__(config, metadata_table)
 
@@ -89,3 +91,19 @@ class KbmodStamps(HyraxDataset, Dataset):
 
     def __len__(self):
         return len(self._data)
+    
+    def normalize_stamps(self):
+        normed_stamps = []
+        sigmaG_coeff =  0.7413
+        for stamp in self._data:
+            stamp = np.copy(stamp)
+            stamp[np.isnan(stamp)] = 0
+            per25,per50,per75 = np.percentile(stamp,[25,50,75])
+            sigmaG = sigmaG_coeff * (per75 - per25)
+            stamp[stamp<(per50-2*sigmaG)] = per50-2*sigmaG
+            stamp -= np.min(stamp)
+            stamp /= np.sum(stamp)
+            stamp[np.isnan(stamp)] = 0
+            normed_stamps.append(stamp)
+        normed_stamps = np.array(normed_stamps)
+        self._data = normed_stamps

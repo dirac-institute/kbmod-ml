@@ -4,7 +4,7 @@ import logging
 
 import torch.nn as nn
 from hyrax.models.model_registry import hyrax_model
-from torchvision.models import resnet50
+from torchvision.models import resnet18
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +16,14 @@ class RESNET50(nn.Module):
 
         self.config = config
 
-        self.model = resnet50(num_classes=2)
+        self.model = resnet18(num_classes=2)
 
         # Modify the input channels to 1 (e.g., for grayscale images)
         self.model = self.modify_resnet_input_channels(self.model, num_channels=shape[0])
 
     def forward(self, x):
+        # if labels are passed to forward as part
+        # of the infer step of training, just pass along the stamps.
         if isinstance(x, tuple):
             x, _ = x
         return self.model(x)
