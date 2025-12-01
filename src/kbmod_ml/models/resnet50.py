@@ -2,6 +2,7 @@
 
 import logging
 
+import torch
 import torch.nn as nn
 from hyrax.models.model_registry import hyrax_model
 from torchvision.models import resnet18
@@ -43,10 +44,12 @@ class RESNET50(nn.Module):
             The loss value for the current batch.
         """
         inputs, labels = batch
+        # inputs = batch["image"]
+        # labels = batch["label"]
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
-        loss = self.criterion(outputs, labels)
+        loss = self.criterion(outputs, labels.type(torch.int64))
         loss.backward()
         self.optimizer.step()
         return {"loss": loss.item()}

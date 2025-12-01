@@ -55,7 +55,7 @@ class KbmodStamps(HyraxDataset, Dataset):
                 np.zeros(len(false_positive_samples), dtype=np.int8),
             ]
         )
-        self._data = np.concatenate([true_positive_samples[:, :3, :, :], false_positive_samples])
+        self._data = np.concatenate([true_positive_samples, false_positive_samples])
 
         self.normalize_stamps()
 
@@ -87,7 +87,11 @@ class KbmodStamps(HyraxDataset, Dataset):
         row = self._data[idx][self.active_columns]
         label = self._labels[idx]
 
-        return torch.tensor(row), torch.tensor(label, dtype=torch.int8)
+        return {
+            "object_id": idx,
+            "image": torch.tensor(row),  # This might need to be torch.tensor(row)
+            "label": torch.tensor(label, dtype=torch.int8)  #this might need to be torch.tensor(label, dtype=torch.int8)
+        }
 
     def __len__(self):
         return len(self._data)
@@ -97,13 +101,15 @@ class KbmodStamps(HyraxDataset, Dataset):
         sigmaG_coeff =  0.7413
         for stamp in self._data:
             stamp = np.copy(stamp)
-            stamp[np.isnan(stamp)] = 0
+            mean_pixel = np.nanmean(stamp)
+            stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0
             per25,per50,per75 = np.percentile(stamp,[25,50,75])
             sigmaG = sigmaG_coeff * (per75 - per25)
             stamp[stamp<(per50-2*sigmaG)] = per50-2*sigmaG
             stamp -= np.min(stamp)
             stamp /= np.sum(stamp)
-            stamp[np.isnan(stamp)] = 0
+            norm_mean_pixel = np.nanmean(stamp)
+            stamp[~np.isfinite(stamp)] = norm_mean_pixel if np.isfinite(norm_mean_pixel) else 0.0
             normed_stamps.append(stamp)
         normed_stamps = np.array(normed_stamps)
         self._data = normed_stamps
