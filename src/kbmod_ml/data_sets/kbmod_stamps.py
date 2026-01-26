@@ -18,7 +18,7 @@ class KbmodStamps(HyraxDataset, Dataset):
     (corresponding to which coadd type we want to use), which could reflect in the `shape` function.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, data_location=None):
         super().__init__(config)
         coadd_type_to_column = {
             "median": 0,
@@ -72,6 +72,13 @@ class KbmodStamps(HyraxDataset, Dataset):
         width, height = self._data[0][0].shape
 
         return (cols, width, height)
+
+    def get_classification(self, idx):
+        return self._labels[idx]
+
+    def get_stamps(self, idx):
+        row = self._data[idx][self.active_columns]
+        return row
     
     def _read_metadata(self):
         """This is a pretend implementation so we don't use the path passed, which you might use
@@ -81,17 +88,22 @@ class KbmodStamps(HyraxDataset, Dataset):
         from astropy.table import Table
 
         global ras, decs, filenames
-        return Table({"object_id": self.ids(), "classification": self._labels})
+        return Table(
+                {
+                    "object_id": self.ids(), 
+                    "classification": self._labels,
+                }
+        )
 
-    def __getitem__(self, idx):
-        row = self._data[idx][self.active_columns]
-        label = self._labels[idx]
+    #def __getitem__(self, idx):
+    #    row = self._data[idx][self.active_columns]
+    #    label = self._labels[idx]
 
-        return {
-            "object_id": idx,
-            "image": torch.tensor(row),  # This might need to be torch.tensor(row)
-            "label": torch.tensor(label, dtype=torch.int8)  #this might need to be torch.tensor(label, dtype=torch.int8)
-        }
+    #    return {
+    #        "object_id": idx,
+    #        "image": torch.tensor(row),  # This might need to be torch.tensor(row)
+    #        "label": torch.tensor(label, dtype=torch.int8)  #this might need to be torch.tensor(label, dtype=torch.int8)
+    #    }
 
     def __len__(self):
         return len(self._data)

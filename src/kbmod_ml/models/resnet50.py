@@ -1,6 +1,7 @@
 # ruff: noqa: D101, D102
 
 import logging
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @hyrax_model
 class RESNET50(nn.Module):
-    def __init__(self, config, shape):
+    def __init__(self, config, data_sample=None):
         super().__init__()
 
         self.config = config
@@ -20,13 +21,16 @@ class RESNET50(nn.Module):
         self.model = resnet18(num_classes=2)
 
         # Modify the input channels to 1 (e.g., for grayscale images)
-        self.model = self.modify_resnet_input_channels(self.model, num_channels=shape[0])
+        self.model = self.modify_resnet_input_channels(self.model, num_channels=1)
+        #self.criterion = nn.BCEWithLogitsLoss()
 
     def forward(self, x):
         # if labels are passed to forward as part
         # of the infer step of training, just pass along the stamps.
-        if isinstance(x, tuple):
+        #print(x)
+        if isinstance(x, tuple) or isinstance(x, list):
             x, _ = x
+        #print(x)
         return self.model(x)
 
     def train_step(self, batch):
@@ -49,7 +53,11 @@ class RESNET50(nn.Module):
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
-        loss = self.criterion(outputs, labels.type(torch.int64))
+        targets = torch.zeros((len(labels), 2))
+        targets[labels == 0, 0] = 1
+        targets[labels == 1, 1] = 1
+        loss = self.criterion(outputs, targets)
+        #loss = torch.nn.BCEWithLogitsLoss()
         loss.backward()
         self.optimizer.step()
         return {"loss": loss.item()}
@@ -72,3 +80,11 @@ class RESNET50(nn.Module):
         model.conv1 = new_conv_layer
 
         return model
+
+    @staticmethod
+    def to_tensor(data):
+        data = data["data"]
+        classification = None
+        if "classification" in data.keys():
+            classification = data["classification"]
+        return data["stamps"], classification
