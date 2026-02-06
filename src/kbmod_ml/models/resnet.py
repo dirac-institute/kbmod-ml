@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @hyrax_model
-class RESNET50(nn.Module):
+class RESNET18(nn.Module):
     def __init__(self, config, data_sample=None):
         super().__init__()
 
@@ -22,15 +22,12 @@ class RESNET50(nn.Module):
 
         # Modify the input channels to 1 (e.g., for grayscale images)
         self.model = self.modify_resnet_input_channels(self.model, num_channels=1)
-        #self.criterion = nn.BCEWithLogitsLoss()
 
     def forward(self, x):
         # if labels are passed to forward as part
         # of the infer step of training, just pass along the stamps.
-        #print(x)
         if isinstance(x, tuple) or isinstance(x, list):
             x, _ = x
-        #print(x)
         return self.model(x)
 
     def train_step(self, batch):
@@ -57,7 +54,6 @@ class RESNET50(nn.Module):
         targets[labels == 0, 0] = 1
         targets[labels == 1, 1] = 1
         loss = self.criterion(outputs, targets)
-        #loss = torch.nn.BCEWithLogitsLoss()
         loss.backward()
         self.optimizer.step()
         return {"loss": loss.item()}

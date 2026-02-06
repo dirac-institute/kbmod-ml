@@ -19,6 +19,14 @@ class KbmodStamps(HyraxDataset, Dataset):
     """
 
     def __init__(self, config, data_location=None):
+        """Initialize the KbmodStamps dataset.
+
+        Takes the `kbmod_ml` elements of the config dict to find the
+        true positive and false positive .npy files, which are expected
+        to be numpy arrays of shape (N_samples, 4, width, height), where
+        the 4 corresponds to the 4 coadd types (median, mean, sum, var_weighted).
+        Also does stamp normalization and label generation.
+        """
         super().__init__(config)
         coadd_type_to_column = {
             "median": 0,
@@ -95,20 +103,11 @@ class KbmodStamps(HyraxDataset, Dataset):
                 }
         )
 
-    #def __getitem__(self, idx):
-    #    row = self._data[idx][self.active_columns]
-    #    label = self._labels[idx]
-
-    #    return {
-    #        "object_id": idx,
-    #        "image": torch.tensor(row),  # This might need to be torch.tensor(row)
-    #        "label": torch.tensor(label, dtype=torch.int8)  #this might need to be torch.tensor(label, dtype=torch.int8)
-    #    }
-
     def __len__(self):
         return len(self._data)
     
     def normalize_stamps(self):
+        """Normalize each stamp."""
         normed_stamps = []
         sigmaG_coeff =  0.7413
         for stamp in self._data:
