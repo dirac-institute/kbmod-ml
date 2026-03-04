@@ -123,3 +123,4 @@ class KbmodStamps(HyraxDataset, Dataset):
             normed_stamps.append(stamp)
         normed_stamps = np.array(normed_stamps)
         self._data = normed_stamps
+        print(self._data)
