@@ -1,10 +1,8 @@
 import os
 
 import numpy as np
-import torch
 from hyrax.data_sets.data_set_registry import HyraxDataset
 from torch.utils.data import Dataset
-from torch.utils.data.sampler import SubsetRandomSampler
 
 
 class KbmodStamps(HyraxDataset, Dataset):
@@ -65,7 +63,7 @@ class KbmodStamps(HyraxDataset, Dataset):
         )
         self._data = np.concatenate([true_positive_samples, false_positive_samples])
 
-        self.normalize_stamps()
+        self.normalize_stamps(ac=self.active_columns[0])
 
         metadata_table = self._read_metadata()
         super().__init__(config, metadata_table)
@@ -87,7 +85,7 @@ class KbmodStamps(HyraxDataset, Dataset):
     def get_stamps(self, idx):
         row = self._data[idx][self.active_columns]
         return row
-    
+
     def _read_metadata(self):
         """This is a pretend implementation so we don't use the path passed, which you might use
         to find your .csv/.fits/.tsv catalog file and call astropy's Table.read().
@@ -98,19 +96,20 @@ class KbmodStamps(HyraxDataset, Dataset):
         global ras, decs, filenames
         return Table(
                 {
-                    "object_id": self.ids(), 
+                    "object_id": self.ids(),
                     "classification": self._labels,
                 }
         )
 
     def __len__(self):
         return len(self._data)
-    
-    def normalize_stamps(self):
+
+    def normalize_stamps(self, ac):
         """Normalize each stamp."""
         normed_stamps = []
         sigmaG_coeff =  0.7413
-        for stamp in self._data:
+        stamps = self._data[:,ac:ac+1]
+        for stamp in stamps:
             stamp = np.copy(stamp)
             mean_pixel = np.nanmean(stamp)
             stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0

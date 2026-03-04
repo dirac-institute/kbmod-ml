@@ -1,7 +1,6 @@
 # ruff: noqa: D101, D102
 
 import logging
-import numpy as np
 
 import torch
 import torch.nn as nn

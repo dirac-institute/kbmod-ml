@@ -1,7 +1,7 @@
-import kbmod as kb
-import numpy as np
 import os
 
+import kbmod as kb
+import numpy as np
 from random_selections import generate_random_selections
 
 """
