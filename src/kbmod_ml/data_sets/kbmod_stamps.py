@@ -111,7 +111,7 @@ class KbmodStamps(HyraxDataset, Dataset):
         for stamp in self._data:
             row = []
             for col in self.active_columns:
-                stamp = np.copy(stamp[:, col : col + 1, :, :])
+                stamp = np.copy(stamp[col : col + 1, :, :])
                 mean_pixel = np.nanmean(stamp)
                 stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0
                 per25, per50, per75 = np.percentile(stamp, [25, 50, 75])
