@@ -109,16 +109,19 @@ class KbmodStamps(HyraxDataset, Dataset):
         normed_stamps = []
         sigmaG_coeff =  0.7413
         for stamp in self._data:
-            stamp = np.copy(stamp[:,1:2,:,:])
-            mean_pixel = np.nanmean(stamp)
-            stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0
-            per25,per50,per75 = np.percentile(stamp,[25,50,75])
-            sigmaG = sigmaG_coeff * (per75 - per25)
-            stamp[stamp<(per50-2*sigmaG)] = per50-2*sigmaG
-            stamp -= np.min(stamp)
-            stamp /= np.sum(stamp)
-            norm_mean_pixel = np.nanmean(stamp)
-            stamp[~np.isfinite(stamp)] = norm_mean_pixel if np.isfinite(norm_mean_pixel) else 0.0
-            normed_stamps.append(stamp)
+            row = []
+            for col in self.active_columns:
+                stamp = np.copy(stamp[:,col:col+1,:,:])
+                mean_pixel = np.nanmean(stamp)
+                stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0
+                per25,per50,per75 = np.percentile(stamp,[25,50,75])
+                sigmaG = sigmaG_coeff * (per75 - per25)
+                stamp[stamp<(per50-2*sigmaG)] = per50-2*sigmaG
+                stamp -= np.min(stamp)
+                stamp /= np.sum(stamp)
+                norm_mean_pixel = np.nanmean(stamp)
+                stamp[~np.isfinite(stamp)] = norm_mean_pixel if np.isfinite(norm_mean_pixel) else 0.0
+                row.append(stamp)
+            normed_stamps.append(row)
         normed_stamps = np.array(normed_stamps)
         self._data = normed_stamps
