@@ -83,7 +83,7 @@ class KbmodStamps(HyraxDataset, Dataset):
         return self._labels[idx]
 
     def get_stamps(self, idx):
-        row = self._data[idx][self.active_columns]
+        row = self._data[idx]
         return row
 
     def _read_metadata(self):
@@ -111,7 +111,7 @@ class KbmodStamps(HyraxDataset, Dataset):
         for stamp in self._data:
             row = []
             for col in self.active_columns:
-                stamp = np.copy(stamp[col : col + 1, :, :])
+                stamp = np.copy(stamp[col, :, :])
                 mean_pixel = np.nanmean(stamp)
                 stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0
                 per25, per50, per75 = np.percentile(stamp, [25, 50, 75])
@@ -122,6 +122,6 @@ class KbmodStamps(HyraxDataset, Dataset):
                 norm_mean_pixel = np.nanmean(stamp)
                 stamp[~np.isfinite(stamp)] = norm_mean_pixel if np.isfinite(norm_mean_pixel) else 0.0
                 row.append(stamp)
-            normed_stamps.append(row)
+            normed_stamps.append(np.array(row))
         normed_stamps = np.array(normed_stamps)
         self._data = normed_stamps
