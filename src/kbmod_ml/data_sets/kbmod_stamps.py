@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from hyrax.data_sets.data_set_registry import HyraxDataset
+from hyrax.datasets.dataset_registry import HyraxDataset
 from torch.utils.data import Dataset
 
 
@@ -61,7 +61,7 @@ class KbmodStamps(HyraxDataset, Dataset):
                 np.zeros(len(false_positive_samples), dtype=np.int8),
             ]
         )
-        self._data = np.concatenate([true_positive_samples, false_positive_samples])
+        self._data = np.concatenate([true_positive_samples, false_positive_samples[:, 0:3]])
 
         self.normalize_stamps()
 
@@ -104,7 +104,7 @@ class KbmodStamps(HyraxDataset, Dataset):
     def __len__(self):
         return len(self._data)
 
-    def normalize_stamps(self):
+    def normalize_stamps2(self):
         """Normalize each stamp."""
         normed_stamps = []
         sigmaG_coeff = 0.7413
@@ -125,3 +125,13 @@ class KbmodStamps(HyraxDataset, Dataset):
             normed_stamps.append(np.array(row))
         normed_stamps = np.array(normed_stamps)
         self._data = normed_stamps
+
+    def normalize_stamps(self):
+        stamps = self._data
+        for i, row in enumerate(self._data):
+            out = row.astype(np.float32)
+            flat = out.reshape(len(out), -1)
+            mu = flat.mean(axis=1, keepdims=True)
+            sig = flat.std(axis=1, keepdims=True)
+            sig[sig == 0] = 1.0
+            self._data[i] = ((flat - mu) / sig).reshape(out.shape)

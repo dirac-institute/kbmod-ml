@@ -39,7 +39,7 @@ class KBModNet(nn.Module):
     def __init__(self, config, data_sample=None):
         super().__init__()
         self.config = config
-        in_channels = 1
+        in_channels = 3
         base=32
         dropout=0.3
         self.stem   = nn.Sequential(
@@ -64,7 +64,10 @@ class KBModNet(nn.Module):
             nn.Dropout(dropout/2),
             nn.Linear(base*2, 2),
         )
+        self.criterion = focal_loss
     def forward(self, x):
+        if isinstance(x, tuple) or isinstance(x, list):
+            x, _ = x
         x = self.stem(x)
         x = self.layer1(x)
         x = self.down1(x)
@@ -73,7 +76,24 @@ class KBModNet(nn.Module):
         x = self.layer3(x)
         return self.head(x)
     
-    def train_step(self, batch):
+    def infer_batch(self, batch):
+        return self(batch)
+    
+    def validate_batch(self, batch):
+        inputs, labels = batch
+        
+        self.optimizer.zero_grad()
+        outputs = self(inputs)
+        targets = torch.zeros((len(labels), 2))
+        targets[labels == 0, 0] = 1
+        targets[labels == 1, 1] = 1
+        loss = focal_loss(outputs, targets)
+        # loss.backward()
+        nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+        self.optimizer.step()
+        return {"loss": loss.item()}
+    
+    def train_batch(self, batch):
         """This function contains the logic for a single training step. i.e. the
         contents of the inner loop of a ML training process.
 
@@ -96,11 +116,12 @@ class KBModNet(nn.Module):
         targets[labels == 1, 1] = 1
         loss = focal_loss(outputs, targets)
         loss.backward()
+        nn.utils.clip_grad_norm_(self.parameters(), 1.0)
         self.optimizer.step()
         return {"loss": loss.item()}
     
     @staticmethod
-    def to_tensor(data):
+    def prepare_inputs(data):
         data = data["data"]
         classification = None
         if "classification" in data.keys():
