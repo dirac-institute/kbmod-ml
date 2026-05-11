@@ -81,40 +81,16 @@ class KBModNet(nn.Module):
     
     def validate_batch(self, batch):
         inputs, labels = batch
-        
-        self.optimizer.zero_grad()
         outputs = self(inputs)
-        targets = torch.zeros((len(labels), 2))
-        targets[labels == 0, 0] = 1
-        targets[labels == 1, 1] = 1
-        loss = focal_loss(outputs, targets)
-        # loss.backward()
-        nn.utils.clip_grad_norm_(self.parameters(), 1.0)
-        self.optimizer.step()
+        loss = focal_loss(outputs, labels)
         return {"loss": loss.item()}
     
     def train_batch(self, batch):
-        """This function contains the logic for a single training step. i.e. the
-        contents of the inner loop of a ML training process.
-
-        Parameters
-        ----------
-        batch : tuple
-            A tuple containing the inputs and labels for the current batch.
-
-        Returns
-        -------
-        Current loss value
-            The loss value for the current batch.
-        """
         inputs, labels = batch
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
-        targets = torch.zeros((len(labels), 2))
-        targets[labels == 0, 0] = 1
-        targets[labels == 1, 1] = 1
-        loss = focal_loss(outputs, targets)
+        loss = focal_loss(outputs, labels)
         loss.backward()
         nn.utils.clip_grad_norm_(self.parameters(), 1.0)
         self.optimizer.step()
@@ -128,55 +104,6 @@ class KBModNet(nn.Module):
             classification = data["classification"]
         return data["stamps"], classification
 
-##changed loss function
 def focal_loss(logits, targets, gamma=2.0):
     ce = F.cross_entropy(logits, targets, reduction="none")
     return ((1 - torch.exp(-ce)) ** gamma * ce).mean()
-
-
-# def train(model, train_loader, val_loader, epochs=50, lr=3e-4, device="cuda"):
-#     model    = model.to(device)
-#     opt      = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-#     sched    = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=1e-6)
-#     history  = {"train_loss": [], "val_loss": [], "val_auc": [], "val_ap": []}
-#     best_auc = 0.0
-
-#     for epoch in range(epochs):
-#         model.train()
-#         losses = []
-#         for x, y in train_loader:
-#             x, y = x.to(device), y.to(device)
-#             opt.zero_grad()
-#             loss = focal_loss(model(x), y)
-#             loss.backward()
-#             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-#             opt.step()
-#             losses.append(loss.item())
-#         sched.step()
-
-#         model.eval()
-#         val_losses, all_probs, all_labels = [], [], []
-#         with torch.no_grad():
-#             for x, y in val_loader:
-#                 x, y = x.to(device), y.to(device)
-#                 val_losses.append(focal_loss(model(x), y).item())
-#                 probs = F.softmax(model(x), dim=1)[:, 1].cpu().numpy()
-#                 all_probs.extend(probs)
-#                 all_labels.extend(y.cpu().numpy())
-
-#         auc = roc_auc_score(all_labels, all_probs)
-#         ap  = average_precision_score(all_labels, all_probs)
-#         history["train_loss"].append(np.mean(losses))
-#         history["val_loss"].append(np.mean(val_losses))
-#         history["val_auc"].append(auc)
-#         history["val_ap"].append(ap)
-
-#         print(f"Epoch {epoch+1:3d}/{epochs}  train={np.mean(losses):.4f}  "
-#               f"val={np.mean(val_losses):.4f}  AUC={auc:.4f}  AP={ap:.4f}")
-
-#         if auc > best_auc:
-#             best_auc = auc
-#             torch.save(model.state_dict(), SAVE_DIR + "best_kbmodnet_5_7sigma.pt")
-#             print(f"  ↑ saved (AUC={auc:.4f})")
-
-#     return history

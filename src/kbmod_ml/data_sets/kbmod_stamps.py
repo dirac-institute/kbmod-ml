@@ -57,8 +57,8 @@ class KbmodStamps(HyraxDataset, Dataset):
 
         self._labels = np.concatenate(
             [
-                np.ones(len(true_positive_samples), dtype=np.int8),
-                np.zeros(len(false_positive_samples), dtype=np.int8),
+                np.ones(len(true_positive_samples), dtype=np.int64),
+                np.zeros(len(false_positive_samples), dtype=np.int64),
             ]
         )
         self._data = np.concatenate([true_positive_samples, false_positive_samples[:, 0:3]])
@@ -127,11 +127,9 @@ class KbmodStamps(HyraxDataset, Dataset):
         self._data = normed_stamps
 
     def normalize_stamps(self):
-        stamps = self._data
-        for i, row in enumerate(self._data):
-            out = row.astype(np.float32)
-            flat = out.reshape(len(out), -1)
-            mu = flat.mean(axis=1, keepdims=True)
-            sig = flat.std(axis=1, keepdims=True)
-            sig[sig == 0] = 1.0
-            self._data[i] = ((flat - mu) / sig).reshape(out.shape)
+        out = self._data.astype(np.float32)
+        flat = out.reshape(len(out), -1)
+        mu = flat.mean(axis=1, keepdims=True)
+        sig = flat.std(axis=1, keepdims=True)
+        sig[sig == 0] = 1.0
+        self._data = ((flat - mu) / sig).reshape(out.shape)
