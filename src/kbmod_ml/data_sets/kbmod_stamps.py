@@ -91,8 +91,41 @@ class KbmodStamps(HyraxDataset, Dataset):
         hurum_test_data = np.concatenate([tp_data[tp_splits["test"]], fp_data[fp_splits["test"]]])
         hurum_test_labels = np.concatenate([tp_labels[tp_splits["test"]], fp_labels[fp_splits["test"]]])
 
-        hurum_train_data = np.concatenate([tp_data[tp_splits["train"]], fp_data[fp_splits["train"]]])
-        hurum_train_labels = np.concatenate([tp_labels[tp_splits["train"]], fp_labels[fp_splits["train"]]])
+        # Interleave TP and FP in training set so sequential batches see both classes
+        tp_train_data = tp_data[tp_splits["train"]]
+        tp_train_labels = tp_labels[tp_splits["train"]]
+        fp_train_data = fp_data[fp_splits["train"]]
+        fp_train_labels = fp_labels[fp_splits["train"]]
+
+        n_tp_train = len(tp_train_data)
+        n_fp_train = len(fp_train_data)
+        ratio = n_fp_train / n_tp_train
+
+        interleaved_data = np.empty((n_tp_train + n_fp_train,) + tp_train_data.shape[1:],
+                                     dtype=tp_train_data.dtype)
+        interleaved_labels = np.empty(n_tp_train + n_fp_train, dtype=tp_train_labels.dtype)
+
+        tp_idx = 0
+        fp_idx = 0
+        out_idx = 0
+        fp_per_tp = ratio
+        fp_debt = 0.0
+
+        for _ in range(n_tp_train + n_fp_train):
+            if tp_idx < n_tp_train and (fp_idx >= n_fp_train or fp_debt <= 0):
+                interleaved_data[out_idx] = tp_train_data[tp_idx]
+                interleaved_labels[out_idx] = tp_train_labels[tp_idx]
+                tp_idx += 1
+                fp_debt += fp_per_tp
+            else:
+                interleaved_data[out_idx] = fp_train_data[fp_idx]
+                interleaved_labels[out_idx] = fp_train_labels[fp_idx]
+                fp_idx += 1
+                fp_debt -= 1.0
+            out_idx += 1
+
+        hurum_train_data = interleaved_data
+        hurum_train_labels = interleaved_labels
 
         hurum_val_data = np.concatenate([tp_data[tp_splits["val"]], fp_data[fp_splits["val"]]])
         hurum_val_labels = np.concatenate([tp_labels[tp_splits["val"]], fp_labels[fp_splits["val"]]])
