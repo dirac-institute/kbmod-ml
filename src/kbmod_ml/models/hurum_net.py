@@ -85,8 +85,19 @@ class KBModNet(nn.Module):
         loss = focal_loss(outputs, labels)
         return {"loss": loss.item()}
     
+    def _augment(self, x):
+        for i in range(len(x)):
+            x[i] = torch.rot90(x[i], torch.randint(0, 4, ()).item(), dims=[1, 2])
+            if torch.rand(1).item() > 0.5:
+                x[i] = torch.flip(x[i], dims=[2])
+            if torch.rand(1).item() > 0.5:
+                x[i] = torch.flip(x[i], dims=[1])
+            x[i] = x[i] + torch.randn_like(x[i]) * 0.05
+        return x
+
     def train_batch(self, batch):
         inputs, labels = batch
+        inputs = self._augment(inputs)
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
