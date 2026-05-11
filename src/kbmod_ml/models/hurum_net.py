@@ -101,7 +101,15 @@ class KBModNet(nn.Module):
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
-        loss = focal_loss(outputs, labels)
+
+        n = len(labels)
+        n_pos = (labels == 1).sum().float().clamp(min=1)
+        n_neg = (labels == 0).sum().float().clamp(min=1)
+        w = torch.where(labels == 1, n / (2.0 * n_pos), n / (2.0 * n_neg))
+
+        ce = F.cross_entropy(outputs, labels, reduction="none")
+        loss = (w * (1 - torch.exp(-ce)) ** 2.0 * ce).mean()
+
         loss.backward()
         nn.utils.clip_grad_norm_(self.parameters(), 1.0)
         self.optimizer.step()
