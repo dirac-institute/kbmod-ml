@@ -6,39 +6,9 @@ from torch.utils.data import Dataset
 
 
 class KbmodStamps(HyraxDataset, Dataset):
-    """TODO: what is the actual shape of the data that we're going to want to import?
-    my initial thoughts is that we'll have a single numpy array that we stitch together
-    from the two datasets (adding a column with a classification based on which set
-    they come from). We should also have the option to select which stamp type we are using
-    (mean, median, sum, and var weighted). So we can just have all those stored as individual rows.
-
-    We could have an "active columns" variable, with the indices of the columns we want to grab
-    (corresponding to which coadd type we want to use), which could reflect in the `shape` function.
-    """
 
     def __init__(self, config, data_location=None):
-        """Initialize the KbmodStamps dataset.
-
-        Takes the `kbmod_ml` elements of the config dict to find the
-        true positive and false positive .npy files, which are expected
-        to be numpy arrays of shape (N_samples, 4, width, height), where
-        the 4 corresponds to the 4 coadd types (median, mean, sum, var_weighted).
-        Also does stamp normalization and label generation.
-        """
         super().__init__(config)
-        coadd_type_to_column = {
-            "median": 0,
-            "mean": 1,
-            "sum": 2,
-            "var_weighted": 3,
-        }
-
-        cols = []
-
-        for c in ["mean"]:
-            cols.append(coadd_type_to_column[c])
-
-        self.active_columns = np.array(cols)
 
         data_dir = config["general"]["data_dir"]
         true_positive_file_name = config["kbmod_ml"]["true_positive_file_name"]
@@ -55,81 +25,128 @@ class KbmodStamps(HyraxDataset, Dataset):
         true_positive_samples = np.load(true_data_path)
         false_positive_samples = np.load(false_data_path)
 
-        self._labels = np.concatenate(
-            [
-                np.ones(len(true_positive_samples), dtype=np.int64),
-                np.zeros(len(false_positive_samples), dtype=np.int64),
-            ]
-        )
-        self._data = np.concatenate([true_positive_samples, false_positive_samples[:, 0:3]])
+        n_tp = len(true_positive_samples)
+        n_fp = len(false_positive_samples)
 
-        self.normalize_stamps()
+        raw_data = np.concatenate([true_positive_samples, false_positive_samples[:, 0:3]])
+        raw_labels = np.concatenate([
+            np.ones(n_tp, dtype=np.int64),
+            np.zeros(n_fp, dtype=np.int64),
+        ])
+
+        self._data = self._normalize(raw_data)
+        self._labels = raw_labels
+
+        seed = config["data_set"]["seed"] if config["data_set"]["seed"] else 42
+        self._arrange_for_hyrax_splits(n_tp, n_fp, seed)
 
         metadata_table = self._read_metadata()
         super().__init__(config, metadata_table)
 
+    def _normalize(self, stamps):
+        out = stamps.astype(np.float32)
+        flat = out.reshape(len(out), -1)
+        mu = flat.mean(axis=1, keepdims=True)
+        sig = flat.std(axis=1, keepdims=True)
+        sig[sig == 0] = 1.0
+        return ((flat - mu) / sig).reshape(out.shape)
+
+    def _arrange_for_hyrax_splits(self, n_tp, n_fp, seed):
+        """Rearrange data so Hyrax's legacy create_splits produces Hurum's exact splits.
+
+        Hurum splits TP and FP independently using default_rng(seed), then
+        concatenates per split. Hyrax shuffles the combined array using
+        np.random.seed(seed) and takes contiguous blocks. This method places
+        Hurum's split data at the positions Hyrax will assign to each split.
+        """
+        total = n_tp + n_fp
+        test_frac = 0.15
+        val_frac = 0.15
+
+        # Hurum's splits: TP and FP split independently
+        rng = np.random.default_rng(seed)
+
+        def hurum_split(n):
+            idx = rng.permutation(n)
+            n_test = int(n * test_frac)
+            n_val = int(n * val_frac)
+            return {
+                "test": idx[:n_test],
+                "val": idx[n_test:n_test + n_val],
+                "train": idx[n_val + n_test:],
+            }
+
+        tp_splits = hurum_split(n_tp)
+        fp_splits = hurum_split(n_fp)
+
+        # Build Hurum's ordered data per split: concat(tp[split], fp[split])
+        orig_data = self._data.copy()
+        orig_labels = self._labels.copy()
+
+        tp_data = orig_data[:n_tp]
+        fp_data = orig_data[n_tp:]
+        tp_labels = orig_labels[:n_tp]
+        fp_labels = orig_labels[n_tp:]
+
+        hurum_test_data = np.concatenate([tp_data[tp_splits["test"]], fp_data[fp_splits["test"]]])
+        hurum_test_labels = np.concatenate([tp_labels[tp_splits["test"]], fp_labels[fp_splits["test"]]])
+
+        hurum_train_data = np.concatenate([tp_data[tp_splits["train"]], fp_data[fp_splits["train"]]])
+        hurum_train_labels = np.concatenate([tp_labels[tp_splits["train"]], fp_labels[fp_splits["train"]]])
+
+        hurum_val_data = np.concatenate([tp_data[tp_splits["val"]], fp_data[fp_splits["val"]]])
+        hurum_val_labels = np.concatenate([tp_labels[tp_splits["val"]], fp_labels[fp_splits["val"]]])
+
+        # Hyrax's legacy split indices (must match create_splits in pytorch_ignite.py)
+        hyrax_indices = list(range(total))
+        np.random.seed(seed)
+        np.random.shuffle(hyrax_indices)
+
+        num_test = int(np.round(total * test_frac))
+        num_train = int(np.round(total * (1.0 - test_frac - val_frac)))
+
+        hyrax_test_positions = hyrax_indices[:num_test]
+        hyrax_train_positions = hyrax_indices[num_test:num_test + num_train]
+        hyrax_val_positions = hyrax_indices[num_test + num_train:]
+
+        # Place Hurum's data at Hyrax's positions
+        new_data = np.empty_like(self._data)
+        new_labels = np.empty_like(self._labels)
+
+        for i, pos in enumerate(hyrax_test_positions):
+            new_data[pos] = hurum_test_data[i]
+            new_labels[pos] = hurum_test_labels[i]
+
+        for i, pos in enumerate(hyrax_train_positions):
+            new_data[pos] = hurum_train_data[i]
+            new_labels[pos] = hurum_train_labels[i]
+
+        for i, pos in enumerate(hyrax_val_positions):
+            new_data[pos] = hurum_val_data[i]
+            new_labels[pos] = hurum_val_labels[i]
+
+        self._data = new_data
+        self._labels = new_labels
+
     def ids(self):
-        """Return the ids of the data set"""
         return np.arange(len(self._data))
 
     def shape(self):
-        """data shape, including currently enabled columns"""
-        cols = len(self.active_columns)
         width, height = self._data[0][0].shape
-
-        return (cols, width, height)
+        return (3, width, height)
 
     def get_classification(self, idx):
         return self._labels[idx]
 
     def get_stamps(self, idx):
-        row = self._data[idx]
-        return row
+        return self._data[idx]
 
     def _read_metadata(self):
-        """This is a pretend implementation so we don't use the path passed, which you might use
-        to find your .csv/.fits/.tsv catalog file and call astropy's Table.read().
-
-        We simply construct a table from our mock data"""
         from astropy.table import Table
-
-        global ras, decs, filenames
-        return Table(
-            {
-                "object_id": self.ids(),
-                "classification": self._labels,
-            }
-        )
+        return Table({
+            "object_id": self.ids(),
+            "classification": self._labels,
+        })
 
     def __len__(self):
         return len(self._data)
-
-    def normalize_stamps2(self):
-        """Normalize each stamp."""
-        normed_stamps = []
-        sigmaG_coeff = 0.7413
-        for stampo in self._data:
-            row = []
-            for col in self.active_columns:
-                stamp = np.copy(stampo[col, :, :])
-                mean_pixel = np.nanmean(stamp)
-                stamp[~np.isfinite(stamp)] = mean_pixel if np.isfinite(mean_pixel) else 0.0
-                per25, per50, per75 = np.percentile(stamp, [25, 50, 75])
-                sigmaG = sigmaG_coeff * (per75 - per25)
-                stamp[stamp < (per50 - 2 * sigmaG)] = per50 - 2 * sigmaG
-                stamp -= np.min(stamp)
-                stamp /= np.sum(stamp)
-                norm_mean_pixel = np.nanmean(stamp)
-                stamp[~np.isfinite(stamp)] = norm_mean_pixel if np.isfinite(norm_mean_pixel) else 0.0
-                row.append(stamp)
-            normed_stamps.append(np.array(row))
-        normed_stamps = np.array(normed_stamps)
-        self._data = normed_stamps
-
-    def normalize_stamps(self):
-        out = self._data.astype(np.float32)
-        flat = out.reshape(len(out), -1)
-        mu = flat.mean(axis=1, keepdims=True)
-        sig = flat.std(axis=1, keepdims=True)
-        sig[sig == 0] = 1.0
-        self._data = ((flat - mu) / sig).reshape(out.shape)
