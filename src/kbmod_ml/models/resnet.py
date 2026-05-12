@@ -2,27 +2,30 @@
 
 import logging
 
+import torch
 import torch.nn as nn
-from fibad.models.model_registry import fibad_model
-from torchvision.models import resnet50
+from hyrax.models.model_registry import hyrax_model
+from torchvision.models import resnet18
 
 logger = logging.getLogger(__name__)
 
 
-@fibad_model
-class RESNET50(nn.Module):
-    def __init__(self, config, shape):
+@hyrax_model
+class RESNET18(nn.Module):
+    def __init__(self, config, data_sample=None):
         super().__init__()
 
         self.config = config
 
-        self.model = resnet50(num_classes=2)
+        self.model = resnet18(num_classes=2)
 
         # Modify the input channels to 1 (e.g., for grayscale images)
-        self.model = self.modify_resnet_input_channels(self.model, num_channels=shape[0])
+        self.model = self.modify_resnet_input_channels(self.model, num_channels=1)
 
     def forward(self, x):
-        if isinstance(x, tuple):
+        # if labels are passed to forward as part
+        # of the infer step of training, just pass along the stamps.
+        if isinstance(x, tuple) or isinstance(x, list):
             x, _ = x
         return self.model(x)
 
@@ -41,10 +44,15 @@ class RESNET50(nn.Module):
             The loss value for the current batch.
         """
         inputs, labels = batch
+        # inputs = batch["image"]
+        # labels = batch["label"]
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
-        loss = self.criterion(outputs, labels)
+        targets = torch.zeros((len(labels), 2))
+        targets[labels == 0, 0] = 1
+        targets[labels == 1, 1] = 1
+        loss = self.criterion(outputs, targets)
         loss.backward()
         self.optimizer.step()
         return {"loss": loss.item()}
@@ -67,3 +75,11 @@ class RESNET50(nn.Module):
         model.conv1 = new_conv_layer
 
         return model
+
+    @staticmethod
+    def to_tensor(data):
+        data = data["data"]
+        classification = None
+        if "classification" in data.keys():
+            classification = data["classification"]
+        return data["stamps"], classification

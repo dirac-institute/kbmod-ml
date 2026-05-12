@@ -1,37 +1,14 @@
 import os
 
 import numpy as np
-import torch
-from fibad.data_sets.data_set_registry import fibad_data_set
-from torch.utils.data.sampler import SubsetRandomSampler
+from hyrax.datasets.dataset_registry import HyraxDataset
+from torch.utils.data import Dataset
 
 
-@fibad_data_set
-class KbmodStamps:
-    """TODO: what is the actual shape of the data that we're going to want to import?
-    my initial thoughts is that we'll have a single numpy array that we stitch together
-    from the two datasets (adding a column with a classification based on which set
-    they come from). We should also have the option to select which stamp type we are using
-    (mean, median, sum, and var weighted). So we can just have all those stored as individual rows.
+class KbmodStamps(HyraxDataset, Dataset):
 
-    We could have an "active columns" variable, with the indices of the columns we want to grab
-    (corresponding to which coadd type we want to use), which could reflect in the `shape` function.
-    """
-
-    def __init__(self, config, split: str):
-        coadd_type_to_column = {
-            "median": 0,
-            "mean": 1,
-            "sum": 2,
-            "var_weighted": 3,
-        }
-
-        cols = []
-
-        for c in ["mean"]:
-            cols.append(coadd_type_to_column[c])
-
-        self.active_columns = np.array(cols)
+    def __init__(self, config, data_location=None):
+        super().__init__(config)
 
         data_dir = config["general"]["data_dir"]
         true_positive_file_name = config["kbmod_ml"]["true_positive_file_name"]
@@ -48,46 +25,161 @@ class KbmodStamps:
         true_positive_samples = np.load(true_data_path)
         false_positive_samples = np.load(false_data_path)
 
-        self._labels = np.concatenate(
-            [
-                np.ones(len(true_positive_samples), dtype=np.int8),
-                np.zeros(len(false_positive_samples), dtype=np.int8),
-            ]
-        )
-        self._data = np.concatenate([true_positive_samples[:, :3, :, :], false_positive_samples])
+        n_tp = len(true_positive_samples)
+        n_fp = len(false_positive_samples)
 
-        if split != "test":
-            num_train = len(self)
-            indices = list(range(num_train))
-            split_idx = 0
-            if config["data_set"]["validate_size"]:
-                split_idx = int(np.floor(config["data_set"]["validate_size"] * num_train))
+        raw_data = np.concatenate([true_positive_samples, false_positive_samples[:, 0:3]])
+        raw_labels = np.concatenate([
+            np.ones(n_tp, dtype=np.int64),
+            np.zeros(n_fp, dtype=np.int64),
+        ])
 
-            random_seed = None
-            if config["data_set"]["seed"]:
-                random_seed = config["data_set"]["seed"]
-            np.random.seed(random_seed)
-            np.random.shuffle(indices)
+        self._data = self._normalize(raw_data)
+        self._labels = raw_labels
 
-            train_idx, valid_idx = indices[split_idx:], indices[:split_idx]
+        seed = config["data_set"]["seed"] if config["data_set"]["seed"] else 42
+        self._arrange_for_hyrax_splits(n_tp, n_fp, seed)
 
-            # These samplers are used by PyTorch's DataLoader to split the dataset
-            # into training and validation sets.
-            self.train_sampler = SubsetRandomSampler(train_idx)
-            self.validation_sampler = SubsetRandomSampler(valid_idx)
+        metadata_table = self._read_metadata()
+        super().__init__(config, metadata_table)
+
+    def _normalize(self, stamps):
+        out = stamps.astype(np.float32)
+        flat = out.reshape(len(out), -1)
+        mu = flat.mean(axis=1, keepdims=True)
+        sig = flat.std(axis=1, keepdims=True)
+        sig[sig == 0] = 1.0
+        return ((flat - mu) / sig).reshape(out.shape)
+
+    def _arrange_for_hyrax_splits(self, n_tp, n_fp, seed):
+        """Rearrange data so Hyrax's legacy create_splits produces Hurum's exact splits.
+
+        Hurum splits TP and FP independently using default_rng(seed), then
+        concatenates per split. Hyrax shuffles the combined array using
+        np.random.seed(seed) and takes contiguous blocks. This method places
+        Hurum's split data at the positions Hyrax will assign to each split.
+        """
+        total = n_tp + n_fp
+        test_frac = 0.15
+        val_frac = 0.15
+
+        # Hurum's splits: TP and FP split independently
+        rng = np.random.default_rng(seed)
+
+        def hurum_split(n):
+            idx = rng.permutation(n)
+            n_test = int(n * test_frac)
+            n_val = int(n * val_frac)
+            return {
+                "test": idx[:n_test],
+                "val": idx[n_test:n_test + n_val],
+                "train": idx[n_val + n_test:],
+            }
+
+        tp_splits = hurum_split(n_tp)
+        fp_splits = hurum_split(n_fp)
+
+        # Build Hurum's ordered data per split: concat(tp[split], fp[split])
+        orig_data = self._data.copy()
+        orig_labels = self._labels.copy()
+
+        tp_data = orig_data[:n_tp]
+        fp_data = orig_data[n_tp:]
+        tp_labels = orig_labels[:n_tp]
+        fp_labels = orig_labels[n_tp:]
+
+        hurum_test_data = np.concatenate([tp_data[tp_splits["test"]], fp_data[fp_splits["test"]]])
+        hurum_test_labels = np.concatenate([tp_labels[tp_splits["test"]], fp_labels[fp_splits["test"]]])
+
+        # Interleave TP and FP in training set so sequential batches see both classes
+        tp_train_data = tp_data[tp_splits["train"]]
+        tp_train_labels = tp_labels[tp_splits["train"]]
+        fp_train_data = fp_data[fp_splits["train"]]
+        fp_train_labels = fp_labels[fp_splits["train"]]
+
+        n_tp_train = len(tp_train_data)
+        n_fp_train = len(fp_train_data)
+        ratio = n_fp_train / n_tp_train
+
+        interleaved_data = np.empty((n_tp_train + n_fp_train,) + tp_train_data.shape[1:],
+                                     dtype=tp_train_data.dtype)
+        interleaved_labels = np.empty(n_tp_train + n_fp_train, dtype=tp_train_labels.dtype)
+
+        tp_idx = 0
+        fp_idx = 0
+        out_idx = 0
+        fp_per_tp = ratio
+        fp_debt = 0.0
+
+        for _ in range(n_tp_train + n_fp_train):
+            if tp_idx < n_tp_train and (fp_idx >= n_fp_train or fp_debt <= 0):
+                interleaved_data[out_idx] = tp_train_data[tp_idx]
+                interleaved_labels[out_idx] = tp_train_labels[tp_idx]
+                tp_idx += 1
+                fp_debt += fp_per_tp
+            else:
+                interleaved_data[out_idx] = fp_train_data[fp_idx]
+                interleaved_labels[out_idx] = fp_train_labels[fp_idx]
+                fp_idx += 1
+                fp_debt -= 1.0
+            out_idx += 1
+
+        hurum_train_data = interleaved_data
+        hurum_train_labels = interleaved_labels
+
+        hurum_val_data = np.concatenate([tp_data[tp_splits["val"]], fp_data[fp_splits["val"]]])
+        hurum_val_labels = np.concatenate([tp_labels[tp_splits["val"]], fp_labels[fp_splits["val"]]])
+
+        # Hyrax's legacy split indices (must match create_splits in pytorch_ignite.py)
+        hyrax_indices = list(range(total))
+        np.random.seed(seed)
+        np.random.shuffle(hyrax_indices)
+
+        num_test = int(np.round(total * test_frac))
+        num_train = int(np.round(total * (1.0 - test_frac - val_frac)))
+
+        hyrax_test_positions = hyrax_indices[:num_test]
+        hyrax_train_positions = hyrax_indices[num_test:num_test + num_train]
+        hyrax_val_positions = hyrax_indices[num_test + num_train:]
+
+        # Place Hurum's data at Hyrax's positions
+        new_data = np.empty_like(self._data)
+        new_labels = np.empty_like(self._labels)
+
+        for i, pos in enumerate(hyrax_test_positions):
+            new_data[pos] = hurum_test_data[i]
+            new_labels[pos] = hurum_test_labels[i]
+
+        for i, pos in enumerate(hyrax_train_positions):
+            new_data[pos] = hurum_train_data[i]
+            new_labels[pos] = hurum_train_labels[i]
+
+        for i, pos in enumerate(hyrax_val_positions):
+            new_data[pos] = hurum_val_data[i]
+            new_labels[pos] = hurum_val_labels[i]
+
+        self._data = new_data
+        self._labels = new_labels
+
+    def ids(self):
+        return np.arange(len(self._data))
 
     def shape(self):
-        """data shape, including currently enabled columns"""
-        cols = len(self.active_columns)
         width, height = self._data[0][0].shape
+        return (3, width, height)
 
-        return (cols, width, height)
+    def get_classification(self, idx):
+        return self._labels[idx]
 
-    def __getitem__(self, idx):
-        row = self._data[idx][self.active_columns]
-        label = self._labels[idx]
+    def get_stamps(self, idx):
+        return self._data[idx]
 
-        return torch.tensor(row), torch.tensor(label, dtype=torch.int8)
+    def _read_metadata(self):
+        from astropy.table import Table
+        return Table({
+            "object_id": self.ids(),
+            "classification": self._labels,
+        })
 
     def __len__(self):
         return len(self._data)

@@ -1,8 +1,8 @@
-from astropy.table import Table
-import os
 import glob
-import numpy as np
+import os
 
+import numpy as np
+from astropy.table import Table
 from random_selections import generate_random_selections
 
 """
@@ -45,7 +45,7 @@ if __name__ == "__main__":
             print(f"completed chunk {i /1000}")
         i += 1
     coadds = np.array(coadds)
-    np.save(f"/mmfs1/home/maxwest/dirac/true_positive_stamps_v2/tp_stamps.npy", coadds)
+    np.save("/mmfs1/home/maxwest/dirac/true_positive_stamps_v2/tp_stamps.npy", coadds)
 
     # the true positive set has extra metadata.
     t = Table()

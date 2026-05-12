@@ -1,15 +1,15 @@
 import numpy as np
-
 from kbmod.search import (
-    RawImage,
-    LayeredImage,
-    ImageStack,
     PSF,
-    get_coadded_stamps,
-    Trajectory,
+    ImageStack,
+    LayeredImage,
+    RawImage,
     StampParameters,
-    StampType
+    StampType,
+    Trajectory,
+    get_coadded_stamps,
 )
+
 
 def generate_random_selections(rows, n, variances=None, visits=None):
     """Takes a 50x50 stamp row and generates N varied sets of stamps,
@@ -79,7 +79,7 @@ def generate_random_selections(rows, n, variances=None, visits=None):
         params.do_filtering = False
         s_types = [StampType.STAMP_MEDIAN, StampType.STAMP_MEAN, StampType.STAMP_SUM]
 
-        stamps = [] 
+        stamps = []
 
         for st in s_types:
             params.stamp_type = st
