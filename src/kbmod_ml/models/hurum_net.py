@@ -105,7 +105,16 @@ class KBModNet(nn.Module):
         loss.backward()
         nn.utils.clip_grad_norm_(self.parameters(), 1.0)
         self.optimizer.step()
+
+        if not hasattr(self, '_epoch_losses'):
+            self._epoch_losses = []
+        self._epoch_losses.append(loss.item())
         return {"loss": loss.item()}
+
+    def log_epoch_metrics(self):
+        avg = sum(self._epoch_losses) / len(self._epoch_losses) if self._epoch_losses else 0
+        self._epoch_losses = []
+        return {"avg_train_loss": avg}
     
     @staticmethod
     def prepare_inputs(data):
