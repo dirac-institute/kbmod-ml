@@ -1,6 +1,5 @@
 import logging
 import os
-import torch
 import numpy as np
 from hyrax.datasets.dataset_registry import HyraxDataset
 from torch.utils.data import Dataset
@@ -195,6 +194,14 @@ class KbmodStamps(HyraxDataset, Dataset):
             if np.random.rand() > 0.5: x = np.flip(x, axis=1)
             x = x + np.random.randn(*x.shape).astype(np.float32) * 0.05
         return x
+
+    def get_normalized_stamps(self, idx):
+        x = self.get_stamps(idx)
+        flat = x.reshape(len(x), -1)
+        mu = flat.mean(axis=1, keepdims=True)
+        sig = flat.std(axis=1, keepdims=True)
+        sig[sig == 0] = 1.0
+        return ((flat - mu) / sig).reshape(x.shape)
 
     def _read_metadata(self):
         from astropy.table import Table
