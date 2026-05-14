@@ -4,3 +4,5 @@ true_positive_file_name = 'true_positive_stamps_full.npy'
 
 # The file name of the false positive samples
 false_positive_file_name = 'false_positive_stamps_trimmed.npy'
+
+augment = false

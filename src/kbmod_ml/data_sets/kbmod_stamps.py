@@ -1,29 +1,32 @@
+import logging
 import os
-
 import numpy as np
 from hyrax.datasets.dataset_registry import HyraxDataset
 from torch.utils.data import Dataset
 
+logger = logging.getLogger(__name__)
 
 class KbmodStamps(HyraxDataset, Dataset):
 
     def __init__(self, config, data_location=None):
         super().__init__(config)
 
-        data_dir = config["general"]["data_dir"]
+        # data_dir = config["general"]["data_dir"]
         true_positive_file_name = config["kbmod_ml"]["true_positive_file_name"]
         false_positive_file_name = config["kbmod_ml"]["false_positive_file_name"]
 
-        true_data_path = os.path.join(data_dir, true_positive_file_name)
-        false_data_path = os.path.join(data_dir, false_positive_file_name)
+        true_data_path = os.path.join(data_location, true_positive_file_name)
+        false_data_path = os.path.join(data_location, false_positive_file_name)
 
         if not os.path.isfile(true_data_path):
-            raise ValueError(f"Could not find {true_positive_file_name} in provided {data_dir}")
+            raise ValueError(f"Could not find {true_positive_file_name} in provided {data_location}")
         if not os.path.isfile(false_data_path):
-            raise ValueError(f"could not find {false_positive_file_name} in provided {data_dir}")
+            raise ValueError(f"could not find {false_positive_file_name} in provided {data_location}")
 
         true_positive_samples = np.load(true_data_path)
+        logger.warning(f"Loaded {len(true_positive_samples)} true positive samples from {true_data_path}")
         false_positive_samples = np.load(false_data_path)
+        logger.warning(f"Loaded {len(false_positive_samples)} false positive samples from {false_data_path}")
 
         n_tp = len(true_positive_samples)
         n_fp = len(false_positive_samples)
@@ -34,11 +37,14 @@ class KbmodStamps(HyraxDataset, Dataset):
             np.zeros(n_fp, dtype=np.int64),
         ])
 
-        self._data = self._normalize(raw_data)
+        self._data = raw_data.astype(np.float32)
+        # self._data = self._normalize(raw_data)
         self._labels = raw_labels
 
         seed = config["data_set"]["seed"] if config["data_set"]["seed"] else 42
-        self._arrange_for_hyrax_splits(n_tp, n_fp, seed)
+        # self._arrange_for_hyrax_splits(n_tp, n_fp, seed)
+
+        self.augment = config["kbmod_ml"]["augment"]
 
         metadata_table = self._read_metadata()
         super().__init__(config, metadata_table)
@@ -168,11 +174,34 @@ class KbmodStamps(HyraxDataset, Dataset):
         width, height = self._data[0][0].shape
         return (3, width, height)
 
+    def get_object_id(self, idx):
+        # Return a 0-padded string of the index with the number of digits needed
+        # for the largest index, e.g. "000123" for index 123 if there are less
+        # than 1 million samples
+        num_digits = len(str(len(self._data) - 1))
+        return f"{idx:0{num_digits}d}"
+
+
     def get_classification(self, idx):
         return self._labels[idx]
 
     def get_stamps(self, idx):
-        return self._data[idx]
+        x = self._data[idx]
+        if self.augment:
+            # reproduce this code using numpy instead of torch
+            x = np.rot90(x, k=np.random.randint(0, 4), axes=(1, 2))
+            if np.random.rand() > 0.5: x = np.flip(x, axis=2)
+            if np.random.rand() > 0.5: x = np.flip(x, axis=1)
+            x = x + np.random.randn(*x.shape).astype(np.float32) * 0.05
+        return x
+
+    def get_normalized_stamps(self, idx):
+        x = self.get_stamps(idx)
+        flat = x.reshape(len(x), -1)
+        mu = flat.mean(axis=1, keepdims=True)
+        sig = flat.std(axis=1, keepdims=True)
+        sig[sig == 0] = 1.0
+        return ((flat - mu) / sig).reshape(x.shape)
 
     def _read_metadata(self):
         from astropy.table import Table
